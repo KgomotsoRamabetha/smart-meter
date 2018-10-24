@@ -1,24 +1,17 @@
+/*Smart Meter Electricity Meter Project By Kgomotso Ramabetha
+ * Major Contributors:University of Cape Town
+ * Thank You to the OpenEnergy Monitoring Project for providing the Emon Library and Examples.
+ */
 //Initialise Libraries, define constants
 
 //incclude LCD Library
 #include <LiquidCrystal.h>
 // EmonLibrary examples openenergymonitor.org, Licence GNU GPL V3
-
 #include "EmonLib.h" // Include Emon Library
 #include <EEPROM.h>
 EnergyMonitor emon1;             // Create an instance
-//#define SAMPLE_TIME 5000  //The time between each EEPROM write function call in ms
-  
-int address = 0;      //EEPROM address counter /** the current address in the EEPROM (i.e. which byte we're going to write to next) **/
- 
-//unsigned long timer;
-
-//float conv_coeff = 0.0;   //coefficient for converting from 0-1024 to 0-5 range
-//void writebalance(); //declare function 
-//void readbalance();
-//void clearEEPROM();
-int writecount = 0;
-
+int address = 0; //store Eprom address
+int writecount = 0; //how many Values have been written to eeprom
 
 //Electricity Charge variables
 float kwh;
@@ -30,7 +23,7 @@ float voltage;
 float credit;
 float owe;
 
-//tariffing setup
+//tariffing setup: Postpaid Bock Tariffing
 float block_rate1 = 1.3516; //R/kwh
 float block_rate2 = 2.1735; //R/kwh
 float current_charge = 1.3516;
@@ -47,6 +40,7 @@ int LED = 13;
 int mode1;
 int mode2;
 
+//FUnction Setup
 void button();
 void button2();
 void tampering();
@@ -65,26 +59,30 @@ void setup() {
   //Begin LCD Interface
   lcd.begin(16,2);
   
-  //setup each module 
-
+  //setup each module : Only Values were changed, setup adopted from OEM.
   emon1.voltage(2, 234.26, 1.7);  // Voltage: input pin, calibration, phase_shift
   emon1.current(1, 111.1);       // Current: input pin, calibration.
-  //byte value = EEPROM.read(address);
-  //balance = value;
-  
-  //float value = EEPROM.read(address);
-  Serial.println("Value from EEzprom :");
+
+  //Serial output, loading stored EEEprom value
+  Serial.println("Value from EEEprom :");
   Serial.println(balance);
 
-  delay(500);
-  lcd.print("Kgomotso Display");
-  
-  //MOve Cursor
-  delay(500);
+//Smart Meter Start-up
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Welcome..."); 
   lcd.setCursor(0,1);
-  lcd.print(balance);
-  //Clear the Line 
-  delay(500);
+  lcd.print("Smart Meter");             
+  delay(3000);
+  lcd.clear();
+  lcd.setCursor(0,0);
+  //default mode prepayment
+  lcd.print("Prepayment Mode");
+  delay(1000);
+  lcd.setCursor(0,1);
+  lcd.print("loading...");
+  
+  delay(3000);
 
   //interrupt handling;
   pinMode(push1,INPUT);
@@ -105,17 +103,12 @@ void loop() {
   //Metering Module Interaction
   metering();
   
-    //update chare based on time-of-use
-    //update balance 
-    //display balance and time-of-use charge on screen 
-
-  
   //Antenna Module 
-    //send packets of data to data concentrator
   antenna();
+   //send packets of data to data concentrator
     
   //customer interface module 
-    //check buttons pressed by customer and modes
+    //check buttons pressed by customer and Switch modes
   switch (mode) {
      case 0:
         // statements
@@ -131,9 +124,9 @@ void loop() {
         // statements
         lcd.clear();
         lcd.setCursor(0,0);
-        lcd.print("Pwr Saving Mode");
-        lcd.setCursor(0,1);
         lcd.print("Major loads off");
+        lcd.setCursor(0,1);
+        lcd.print("Post-pay mode...");
         digitalWrite(10,HIGH);
         creditmode();
         //delay(1000);
@@ -153,27 +146,15 @@ void loop() {
         // statements
         break;
     }
-
-
-  
-    
-  //load control Module
-    //check if balance is 0 and switch off load if balnce is 0
-    //check remote control requests from utility and customer
-
-  //wireless communication module
-    //send consumtion information to cloud database
-    //if tampering has occured send to utility 
-
-  //card reader module 
-    //allow custome rto upload credits if credit upload mode is pressed
-    //if remote recharge has occured update balnce }
+//Other Functionality on Second Core
   }
   
 float metering(){
-  emon1.calcVI(20,2000);         // Calculate all. No.of half wavelengths (crossings), time-out
-  emon1.serialprint();           // Print out all variables (realpower, apparent power, Vrms, Irms, power factor)
   
+  emon1.calcVI(20,2000);         // Calculate all. No.of half wavelengths (crossings), time-out
+  emon1.serialprint();  // Print out all variables (realpower, apparent power, Vrms, Irms, power factor)
+  
+  //adopted from OEM examples
   float realPower       = emon1.realPower;        //extract Real Power into variable
   float apparentPower   = emon1.apparentPower;    //extract Apparent Power into variable
   float powerFactor     = emon1.powerFactor;      //extract Power Factor into Variable
@@ -183,8 +164,8 @@ float metering(){
   
   delay(1000);
   //Calculate the consumption using c/kwh
-  kwh= 1; //(realPower/1000)* (5/3600);
-  consumption = kwh * current_charge; //update energy used
+  kwh= 0.5; //(realPower/1000)* (5/3600);
+  consumption = kwh; //update energy used
   balance = balance - consumption; //update the balance
   
   Serial.println(kwh);
@@ -241,7 +222,7 @@ void antenna(){
   }
 
 void creditmode(){
-  
+  //Adopted from OEM examples
   emon1.calcVI(20,2000);         // Calculate all. No.of half wavelengths (crossings), time-out
   emon1.serialprint();           // Print out all variables (realpower, apparent power, Vrms, Irms, power factor)
   
@@ -253,8 +234,11 @@ void creditmode(){
   //delay(5000);
   
   delay(1000);
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Post-Pay mode");
   //Calculate the consumption using c/kwh
-  kwh= 1; //(realPower/1000)* (5/3600);
+  kwh= (0.5); //(realPower/1000)* (5/3600);
   owe = kwh * current_charge; //update energy used
   credit = credit + owe; //update the balance
   
@@ -262,14 +246,15 @@ void creditmode(){
   Serial.println(owe);
   Serial.println(credit);
   Serial.println();
-  delay(1000);
+  delay(2000);
   
+  lcd.clear();
   lcd.setCursor(0,1);
   lcd.print("                                                                   ");
   delay(10);
   lcd.setCursor(0,0);
-  lcd.print("Balance:");
+  lcd.print("Credit:");
   lcd.setCursor(0,1);
-  lcd.print(balance);
+  lcd.print(credit);
   
   }
