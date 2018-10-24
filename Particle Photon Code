@@ -1,0 +1,183 @@
+// This #include statement was automatically added by the Particle IDE.
+#include <MFRC522.h>
+
+/*Smart Meter Project Peripheral Code
+Major Contributors: University Of Cape Town
+Code adopted from Particle Cloud Examples and Open Energy Monitoring
+Recharge Code Adopted from RFID-RC522 Library
+Bluynk Code Adopted from setup example
+Thingspeak Code adopted from thingspeak Examples
+*/
+
+
+// This #include statement was automatically added by the Particle IDE.
+#include <blynk.h>
+
+// This #include statement was automatically added by the Particle IDE.
+#include <ThingSpeak.h>
+
+// This #include statement was automatically added by the Particle IDE.
+#include <semonlib.h>
+
+#define BLYNK_PRINT Serial  // Set serial output for debug prints
+
+#include <blynk.h>
+
+ 
+#define SS_PIN A2
+#define RST_PIN D2
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance.
+
+
+//Code from Particle Cloud Examples
+const unsigned long POLL_INTERVAL_MS = 3000;
+const unsigned long PUBLISH_INTERVAL_MS = 60000;
+unsigned long lastPollMs = 0;
+unsigned long lastPublishMs = 3000 - PUBLISH_INTERVAL_MS;
+volatile int currentLevel= LOW;
+
+
+BlynkTimer timer;
+int mode;
+
+// This function sends up time every second to Virtual Pin (5)
+void myTimerEvent()
+{
+  // You can send any value at any time.
+  float sensorData = analogRead(A0);
+  Blynk.virtualWrite(V5, sensorData);
+}
+
+//Auth Token in the Blynk App.
+char auth[] = "36de8a3ee9934cafa2aaa52e06ddd378";
+
+#define publish_delay 16000
+unsigned int lastPublish = 0;
+
+
+EnergyMonitor emon1;// Create an instance-Class EnergyMoitor
+TCPClient client;
+
+int sendDelay = 60000;
+
+unsigned int myChannelNumber = 607594;
+const char * myWriteAPIKey = "Y3BSX167MO0UZHNQ";
+
+
+void setup()
+{  
+  pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
+  Serial.begin(9600);
+  
+    pinMode(A1, INPUT);
+    pinMode(A0, INPUT);
+    pinMode(D5, INPUT);
+    
+  
+  emon1.voltage(A0, 234.26, 1.7);  // Voltage: input pin, calibration, phase_shift
+  emon1.current(A1, 111.1);       // Current: input pin, calibration.
+  
+  ThingSpeak.begin(client);
+  
+     Serial.begin(9600);
+    delay(5000); // Allow board to settle
+
+    Blynk.begin(auth);
+    // Setup a function to be called every second
+    timer.setInterval(1000L, myTimerEvent);
+    
+    
+    //attachInterrupt(A1, powersave, CHANGE);
+    //attachInterrupt(A0, tampering, RISING);
+    //attachInterrupt(D5, recharge, RISING);
+    
+  SPI.begin();      // Initiate  SPI bus
+  mfrc522.setSPIConfig();   
+  mfrc522.PCD_Init();// Initiate MFRC522
+  
+    waitUntil(Particle.connected);
+  interrupts();
+  pinMode(DAC, INPUT);
+}
+
+void loop()
+{
+     Blynk.run();
+    timer.run(); // Initiates BlynkTimer
+  
+  emon1.calcVI(20,2000);         // Calculate all. No.of half wavelengths (crossings), time-out
+  emon1.serialprint();           // Print out all variables (realpower, apparent power, Vrms, Irms, power factor)
+  
+  float realPower       = emon1.realPower;        //extract Real Power into variable
+  float apparentPower   = emon1.apparentPower;    //extract Apparent Power into variable
+  float PowerFActor     = emon1.powerFactor;      //extract Power Factor into Variable
+  float supplyVoltage   = emon1.Vrms;             //extract Vrms into Variable
+  float Irms            = emon1.Irms;    //extract Irms into Variable
+  
+  
+  ThingSpeak.setField(1,realPower);
+  ThingSpeak.setField(2,apparentPower);
+  ThingSpeak.setField(3,PowerFActor);
+  ThingSpeak.setField(4,supplyVoltage);
+  ThingSpeak.setField(5,Irms);
+  
+  unsigned long now = millis();
+  
+  if ((now - lastPublish)>publish_delay){
+      // Write the fields that you've set all at once.
+    ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);  
+    lastPublish = now; //save the last time you sent data
+  }
+  
+     //Code Adopted From Particle Library Examples
+      // Look for new cards
+  if ( ! mfrc522.PICC_IsNewCardPresent()) 
+  {
+    return;
+  }
+  // Select one of the cards
+  if ( ! mfrc522.PICC_ReadCardSerial()) 
+  {
+    return;
+  }
+  
+  //Show Card ID
+  String content= "";
+  byte letter;
+  for (byte i = 0; i < mfrc522.uid.size; i++) 
+  {
+     content.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+     content.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  
+  content.toUpperCase();
+  if (content.substring(1) == "EC 84 9A 07") //change here the UID of the card/cards that you want to give access
+  {
+    if (Particle.connected()) {
+    int amount=100;
+    pinMode(WKP, OUTPUT);
+    Particle.publish("Successfull Recharged: Meter EC 84 9A 07 ", "100", PRIVATE);
+    delay(500);
+    analogWrite(WKP, amount);
+    delay(20000);
+  }
+    
+    
+  }
+ 
+ else   {
+    Serial.println("Please Enter correct code");
+    delay(2000);
+  }
+
+if (millis() - lastPollMs >= POLL_INTERVAL_MS) {
+    lastPollMs = millis();
+    currentLevel = digitalRead(DAC);
+    if (digitalRead(DAC) == HIGH) {
+        Particle.publish("tampering-detected", "meterID", PRIVATE);
+            }
+        }
+}
+ 
