@@ -1,7 +1,7 @@
 # SMART-METER
 
 ## Introduction
-Smart electricity meters are electronic devices that allow two-way communication between different stakeholders of the electricity delivery and consumption ecosystem. On a low level, these devices are responsible for calculating electricity consumption information and sending it to the necessary stakeholders. On a higher level, these devices integrate complex communications technology to transmit and receive information. This ability allows the smart meter to satisfy many functional capabilities required by different stakeholders. The Schematic below shows the hardwae implementation:
+Smart electricity meters are electronic devices that allow two-way communication between different stakeholders of the electricity delivery and consumption ecosystem. On a low level, these devices are responsible for calculating electricity consumption information and sending it to the necessary stakeholders. On a higher level, these devices integrate complex communications technology to transmit and receive information. This ability allows the smart meter to satisfy many functional capabilities required by different stakeholders. The Schematic below shows the hardware implementation:
 
 ![schematic](https://user-images.githubusercontent.com/44380530/47552375-d3203500-d904-11e8-940a-f74f9882ae56.png)
 
